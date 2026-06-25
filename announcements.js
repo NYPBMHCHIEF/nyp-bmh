@@ -27,7 +27,7 @@
 */
 
 // ── PASTE YOUR ONEDRIVE CSV LINK HERE ──
-const ANNOUNCEMENTS_URL = 'PASTE_YOUR_ONEDRIVE_CSV_LINK_HERE';
+const ANNOUNCEMENTS_URL = 'https://newyorkpresbyterian-my.sharepoint.com/:x:/g/personal/lhw9007_nyp_org/IQAMW_B1WnuET58Dd5Z2NfHzAaj2-ZRshpfshrtEOVFuYBU?e=vRlZJo&download=1';
 // ────────────────────────────────────────
 
 // Fallback announcements shown before OneDrive is connected
@@ -84,6 +84,64 @@ function renderAnnouncements(items) {
   `).join('');
 }
 
+// ── Cycling hero announcement card ──
+let heroAnnItems = [];
+let heroAnnIndex = 0;
+let heroAnnTimer = null;
+
+function renderHeroAnnDots() {
+  const dotsEl = document.getElementById('hero-ann-dots');
+  if (!dotsEl) return;
+  dotsEl.innerHTML = heroAnnItems.map((_, i) =>
+    `<div class="hero-ann-dot${i === heroAnnIndex ? ' active' : ''}" data-i="${i}"></div>`
+  ).join('');
+  // allow clicking a dot to jump to that announcement
+  dotsEl.querySelectorAll('.hero-ann-dot').forEach(dot => {
+    dot.style.cursor = 'pointer';
+    dot.addEventListener('click', () => {
+      heroAnnIndex = parseInt(dot.getAttribute('data-i'), 10);
+      showHeroAnn();
+      restartHeroAnnTimer();
+    });
+  });
+}
+
+function showHeroAnn() {
+  const contentEl = document.getElementById('hero-ann-content');
+  if (!contentEl || heroAnnItems.length === 0) return;
+  const item = heroAnnItems[heroAnnIndex];
+  contentEl.innerHTML = `
+    <div class="hero-ann-fade">
+      <div class="hero-ann-tag">${item.tag}${item.date ? ' · ' + item.date + ' ' + item.month : ''}</div>
+      <div class="hero-ann-text">${item.text}</div>
+      ${item.subtext ? `<div class="hero-ann-sub">${item.subtext}</div>` : ''}
+    </div>
+  `;
+  renderHeroAnnDots();
+}
+
+function restartHeroAnnTimer() {
+  if (heroAnnTimer) clearInterval(heroAnnTimer);
+  if (heroAnnItems.length <= 1) return;
+  heroAnnTimer = setInterval(() => {
+    heroAnnIndex = (heroAnnIndex + 1) % heroAnnItems.length;
+    showHeroAnn();
+  }, 5000); // cycle every 5 seconds
+}
+
+function renderHeroAnnouncements(items) {
+  const contentEl = document.getElementById('hero-ann-content');
+  if (!contentEl) return; // hero card not on this page
+  if (!items || items.length === 0) {
+    contentEl.innerHTML = '<p style="color:rgba(255,255,255,0.5);font-size:12px;">No announcements right now.</p>';
+    return;
+  }
+  heroAnnItems = items;
+  heroAnnIndex = 0;
+  showHeroAnn();
+  restartHeroAnnTimer();
+}
+
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   // skip header row
@@ -117,6 +175,7 @@ async function loadAnnouncements() {
   // If no URL set yet, show fallback
   if (!ANNOUNCEMENTS_URL || ANNOUNCEMENTS_URL === 'PASTE_YOUR_ONEDRIVE_CSV_LINK_HERE') {
     renderAnnouncements(FALLBACK_ANNOUNCEMENTS);
+    renderHeroAnnouncements(FALLBACK_ANNOUNCEMENTS);
     return;
   }
 
@@ -125,10 +184,13 @@ async function loadAnnouncements() {
     if (!response.ok) throw new Error('Could not load');
     const text = await response.text();
     const items = parseCSV(text);
-    renderAnnouncements(items.length > 0 ? items : FALLBACK_ANNOUNCEMENTS);
+    const finalItems = items.length > 0 ? items : FALLBACK_ANNOUNCEMENTS;
+    renderAnnouncements(finalItems);
+    renderHeroAnnouncements(finalItems);
   } catch (err) {
     // If fetch fails, show fallback silently
     renderAnnouncements(FALLBACK_ANNOUNCEMENTS);
+    renderHeroAnnouncements(FALLBACK_ANNOUNCEMENTS);
   }
 }
 
